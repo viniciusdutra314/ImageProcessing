@@ -10,27 +10,29 @@ typedef struct ImagePGM {
   int height;
 } ImagePGM;
 
-void ImagePGM_close(ImagePGM* img){
-    free(img->buffer);
-    img->max_gray=0;
-    img->height=0;
-    img->width=0;
+void ImagePGM_close(ImagePGM *img) {
+  free(img->buffer);
+  img->max_gray = 0;
+  img->height = 0;
+  img->width = 0;
 }
-
 
 void skip_pgm_comments(FILE *fp) {
   int ch;
-  while ((ch = fgetc(fp)) != EOF &&
-         (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'))
-    ;
-  if (ch == '#') {
-    while ((ch = fgetc(fp)) != EOF && ch != '\n')
-      ;
-    skip_pgm_comments(fp);
-  } else if (ch != EOF) {
-    ungetc(ch, fp);
+  while ((ch = fgetc(fp)) != EOF) {
+    if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r') {
+      continue;
+    }
+    if (ch == '#') {
+      while ((ch = fgetc(fp)) != EOF && ch != '\n')
+        ;
+    } else {
+      ungetc(ch, fp);
+      break;
+    }
   }
 }
+
 
 int read_pgm_file(char const *filepath, ImagePGM *img) {
   FILE *pgm_file = NULL;
@@ -92,12 +94,12 @@ clean:
 
 int main(int argc, char **argv) {
   if (argc != 2) {
-    puts("Especifique uma imagem .pgm de entrada");
+    printf("Especifique uma imagem .pgm de entrada\n");
     return 1;
   }
   ImagePGM img = {0};
   if (read_pgm_file(argv[1], &img)) {
-    fprintf(stderr, "Erro na leitura da imagem %s", argv[1]);
+    fprintf(stderr, "Erro na leitura da imagem %s\n", argv[1]);
     return 1;
   }
   printf("Imagem com %d colunas e %d linhas \n", img.width, img.height);
