@@ -37,7 +37,60 @@ typedef struct Axis {
   uint16_t width;
 } Axis;
 
-// void lineplot(Axis ax, uint16_t *x, uint16_t *y, size_t N) {}
+void ImagePPM_draw_line(ImagePPM *img, Point2D p1, Point2D p2, RGB color,uint16_t thickness) {
+  int32_t delta_x = (int32_t)p2.x - (int32_t)p1.x;
+  int32_t delta_y = (int32_t)p2.y - (int32_t)p1.y;
+  uint16_t delta_gamma = MAX(abs(delta_x), abs(delta_y));
+  for (uint16_t gamma = 0; gamma <= delta_gamma; gamma++) {
+    uint16_t x = roundf((float)p1.x + (gamma * (float)delta_x / delta_gamma));
+    uint16_t y = roundf((float)p1.y + (gamma * (float)delta_y / delta_gamma));
+    int16_t offset = thickness / 2;
+    for (int16_t dy = -offset; dy <= offset; dy++) {
+      for (int16_t dx = -offset; dx <= offset; dx++) {
+        uint32_t nx = x + dx;
+        uint32_t ny = y + dy;
+        if (nx < img->width && ny < img->height) {
+          img->buffer[img->width * ny + nx] = color;
+        }
+      }
+    }
+  }
+}
+
+void ImagePPM_draw_lineplot(ImagePPM* img, Axis ax, double* x, double* y, size_t N, RGB color, uint16_t thickness) {
+    double x_min, x_max, y_min, y_max;
+    x_min = y_min = INFINITY;
+    x_max = y_max = -INFINITY;
+
+    for (size_t i = 0; i < N; i++) {
+        if (x[i] < x_min) x_min = x[i];
+        if (x[i] > x_max) x_max = x[i];
+        if (y[i] < y_min) y_min = y[i];
+        if (y[i] > y_max) y_max = y[i];
+    }
+    double extra_padding=0.05;
+    double plot_x_start = img->width * (ax.padding+extra_padding);
+    double plot_x_end = img->width * (1.0 - ax.padding-extra_padding);
+    double plot_y_start = img->height * (1.0 - ax.padding-extra_padding);
+    double plot_y_end = img->height * (ax.padding+extra_padding);
+
+    double x_range = x_max - x_min;
+    double y_range = y_max - y_min;
+
+
+    for (size_t i = 0; i < N - 1; i++) {
+        Point2D p1, p2;
+        p1.x = (uint16_t)(plot_x_start + (x[i] - x_min) / x_range * (plot_x_end - plot_x_start));
+        p1.y = (uint16_t)(plot_y_start + (y[i] - y_min)/ y_range * (plot_y_end - plot_y_start)) ;
+
+        p2.x = (uint16_t)(plot_x_start + (x[i+1] - x_min)/ x_range * (plot_x_end - plot_x_start));
+        p2.y = (uint16_t)(plot_y_start + (y[i+1] - y_min)/y_range * (plot_y_end - plot_y_start));
+
+        ImagePPM_draw_line(img, p1, p2, color, thickness);
+    }
+}
+
+
 
 int ImagePPM_save(ImagePPM const *img, char const *filepath) {
   FILE *file = fopen(filepath, "wb");
@@ -70,8 +123,8 @@ ImagePPM ImagePPM_create_solid_canvas(RGB color, uint16_t width,
   return img;
 }
 
-int __ImagePPM_draw_shallow_rectangle(ImagePPM *img, RGB color, Point2D p1,
-                                    Point2D p2, uint16_t width) {
+int ImagePPM_draw_shallow_rectangle(ImagePPM *img, RGB color, Point2D p1,
+                                      Point2D p2, uint16_t width) {
   uint16_t x_min = MIN(p1.x, p2.x);
   uint16_t x_max = MAX(p1.x, p2.x);
   uint16_t y_min = MIN(p1.y, p2.y);
@@ -101,7 +154,7 @@ int __ImagePPM_draw_shallow_rectangle(ImagePPM *img, RGB color, Point2D p1,
 }
 
 int ImagePPM_draw_ax(ImagePPM *img, Axis ax) {
-  return __ImagePPM_draw_shallow_rectangle(
+  return ImagePPM_draw_shallow_rectangle(
       img, (RGB){0, 0, 0},
       (Point2D){img->width * ax.padding, img->height * ax.padding},
       (Point2D){img->width * (1 - ax.padding), img->height * (1 - ax.padding)},
@@ -221,11 +274,19 @@ int main(int argc, char **argv) {
   printf("Maior cinza definido no arquivo %hu \n", img.max_gray);
   printf("---------------\n");
 
-  uint16_t width = 800;
-  uint16_t height = 600;
-  ImagePPM img_test =
-      ImagePPM_create_solid_canvas((RGB){.r=255, .g=255, .b=255}, width, height);
-  ImagePPM_draw_ax(&img_test, (Axis){.width=10,.padding=0.125});
+  uint16_t width = 1920;
+  uint16_t height = 1080;
+  ImagePPM img_test = ImagePPM_create_solid_canvas(
+      (RGB){.r = 255, .g = 255, .b = 255}, width, height);
+  Axis ax={.width=10,.padding=0.125};
+  ImagePPM_draw_ax(&img_test, ax);
+  size_t N = 1000;
+  double x[N], y[N];
+  for (size_t i = 0; i < N; i++) {
+    x[i] = (double)i / (N - 1) * 5;
+    y[i] = sinf(x[i] * x[i])/(x[i]+1);
+  }
+  ImagePPM_draw_lineplot(&img_test,ax, x, y, N, (RGB){255, 0, 0}, 5);
   ImagePPM_save(&img_test, "teste.ppm");
 
   // uint16_t line_number;
