@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +8,7 @@
 #define sign(x) ((x > 0) - (x < 0))
 #define MAX(x, y) x > y ? x : y
 #define MIN(x, y) x > y ? y : x
+#define PI 3.1415926
 
 typedef struct ImagePGM {
   uint16_t *buffer;
@@ -35,9 +37,47 @@ typedef struct Point2D {
 typedef struct Axis {
   double padding;
   uint16_t width;
+  bool grid;
 } Axis;
 
-void ImagePPM_draw_line(ImagePPM *img, Point2D p1, Point2D p2, RGB color,uint16_t thickness) {
+const uint8_t font_data[] = {
+#embed "IBM_VGA_8x8.bin"
+};
+
+void ImagePPM_draw_char(ImagePPM *img, Point2D pos, char c, RGB color,
+                        uint16_t scale) {
+  uint8_t char_idx = (uint8_t)c;
+  const uint8_t *bitmap = &font_data[char_idx * 8];
+
+  for (int i = 0; i < 8; i++) {
+    for (int j = 0; j < 8; j++) {
+      if (bitmap[i] & (1 << (7 - j))) {
+        for (uint16_t sy = 0; sy < scale; sy++) {
+          for (uint16_t sx = 0; sx < scale; sx++) {
+            uint32_t nx = pos.x + (j * scale) + sx;
+            uint32_t ny = pos.y + (i * scale) + sy;
+            if (nx < img->width && ny < img->height) {
+              img->buffer[ny * img->width + nx] = color;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+void ImagePPM_draw_string(ImagePPM *img, Point2D pos, const char *str,
+                          RGB color, uint16_t scale) {
+  uint16_t current_x = pos.x;
+  while (*str != '\0') {
+    ImagePPM_draw_char(img, (Point2D){current_x, pos.y}, *str, color, scale);
+    current_x += 8 * scale;
+    str++;
+  }
+}
+
+void ImagePPM_draw_line(ImagePPM *img, Point2D p1, Point2D p2, RGB color,
+                        uint16_t thickness) {
   int32_t delta_x = (int32_t)p2.x - (int32_t)p1.x;
   int32_t delta_y = (int32_t)p2.y - (int32_t)p1.y;
   uint16_t delta_gamma = MAX(abs(delta_x), abs(delta_y));
@@ -57,40 +97,46 @@ void ImagePPM_draw_line(ImagePPM *img, Point2D p1, Point2D p2, RGB color,uint16_
   }
 }
 
-void ImagePPM_draw_lineplot(ImagePPM* img, Axis ax, double* x, double* y, size_t N, RGB color, uint16_t thickness) {
-    double x_min, x_max, y_min, y_max;
-    x_min = y_min = INFINITY;
-    x_max = y_max = -INFINITY;
+void ImagePPM_draw_lineplot(ImagePPM *img, Axis ax, double *x, double *y,
+                            size_t N, RGB color, uint16_t thickness,
+                            double padding) {
+  double x_min, x_max, y_min, y_max;
+  x_min = y_min = INFINITY;
+  x_max = y_max = -INFINITY;
 
-    for (size_t i = 0; i < N; i++) {
-        if (x[i] < x_min) x_min = x[i];
-        if (x[i] > x_max) x_max = x[i];
-        if (y[i] < y_min) y_min = y[i];
-        if (y[i] > y_max) y_max = y[i];
-    }
-    double extra_padding=0.05;
-    double plot_x_start = img->width * (ax.padding+extra_padding);
-    double plot_x_end = img->width * (1.0 - ax.padding-extra_padding);
-    double plot_y_start = img->height * (1.0 - ax.padding-extra_padding);
-    double plot_y_end = img->height * (ax.padding+extra_padding);
+  for (size_t i = 0; i < N; i++) {
+    if (x[i] < x_min)
+      x_min = x[i];
+    if (x[i] > x_max)
+      x_max = x[i];
+    if (y[i] < y_min)
+      y_min = y[i];
+    if (y[i] > y_max)
+      y_max = y[i];
+  }
+  double plot_x_start = img->width * (ax.padding + padding);
+  double plot_x_end = img->width * (1.0 - ax.padding - padding);
+  double plot_y_start = img->height * (1.0 - ax.padding - padding);
+  double plot_y_end = img->height * (ax.padding + padding);
 
-    double x_range = x_max - x_min;
-    double y_range = y_max - y_min;
+  double x_range = x_max - x_min;
+  double y_range = y_max - y_min;
 
+  for (size_t i = 0; i < N - 1; i++) {
+    Point2D p1, p2;
+    p1.x = (uint16_t)(plot_x_start +
+                      (x[i] - x_min) / x_range * (plot_x_end - plot_x_start));
+    p1.y = (uint16_t)(plot_y_start +
+                      (y[i] - y_min) / y_range * (plot_y_end - plot_y_start));
 
-    for (size_t i = 0; i < N - 1; i++) {
-        Point2D p1, p2;
-        p1.x = (uint16_t)(plot_x_start + (x[i] - x_min) / x_range * (plot_x_end - plot_x_start));
-        p1.y = (uint16_t)(plot_y_start + (y[i] - y_min)/ y_range * (plot_y_end - plot_y_start)) ;
+    p2.x = (uint16_t)(plot_x_start + (x[i + 1] - x_min) / x_range *
+                                         (plot_x_end - plot_x_start));
+    p2.y = (uint16_t)(plot_y_start + (y[i + 1] - y_min) / y_range *
+                                         (plot_y_end - plot_y_start));
 
-        p2.x = (uint16_t)(plot_x_start + (x[i+1] - x_min)/ x_range * (plot_x_end - plot_x_start));
-        p2.y = (uint16_t)(plot_y_start + (y[i+1] - y_min)/y_range * (plot_y_end - plot_y_start));
-
-        ImagePPM_draw_line(img, p1, p2, color, thickness);
-    }
+    ImagePPM_draw_line(img, p1, p2, color, thickness);
+  }
 }
-
-
 
 int ImagePPM_save(ImagePPM const *img, char const *filepath) {
   FILE *file = fopen(filepath, "wb");
@@ -124,7 +170,7 @@ ImagePPM ImagePPM_create_solid_canvas(RGB color, uint16_t width,
 }
 
 int ImagePPM_draw_shallow_rectangle(ImagePPM *img, RGB color, Point2D p1,
-                                      Point2D p2, uint16_t width) {
+                                    Point2D p2, uint16_t width) {
   uint16_t x_min = MIN(p1.x, p2.x);
   uint16_t x_max = MAX(p1.x, p2.x);
   uint16_t y_min = MIN(p1.y, p2.y);
@@ -154,11 +200,27 @@ int ImagePPM_draw_shallow_rectangle(ImagePPM *img, RGB color, Point2D p1,
 }
 
 int ImagePPM_draw_ax(ImagePPM *img, Axis ax) {
-  return ImagePPM_draw_shallow_rectangle(
-      img, (RGB){0, 0, 0},
-      (Point2D){img->width * ax.padding, img->height * ax.padding},
-      (Point2D){img->width * (1 - ax.padding), img->height * (1 - ax.padding)},
-      ax.width);
+  uint16_t x_min = img->width * ax.padding;
+  uint16_t x_max = img->width * (1 - ax.padding);
+  uint16_t y_min = img->height * ax.padding;
+  uint16_t y_max = img->height * (1 - ax.padding);
+
+  if (ax.grid) {
+    RGB grid_color = {200, 200, 200};
+    int num_divs = 10;
+    for (int i = 1; i < num_divs; i++) {
+      uint16_t gx = x_min + (i * (x_max - x_min)) / num_divs;
+      uint16_t gy = y_min + (i * (y_max - y_min)) / num_divs;
+      ImagePPM_draw_line(img, (Point2D){gx, y_min}, (Point2D){gx, y_max},
+                         grid_color, 2);
+      ImagePPM_draw_line(img, (Point2D){x_min, gy}, (Point2D){x_max, gy},
+                         grid_color, 2);
+    }
+  }
+
+  return ImagePPM_draw_shallow_rectangle(img, (RGB){0, 0, 0},
+                                         (Point2D){x_min, y_min},
+                                         (Point2D){x_max, y_max}, ax.width);
 }
 
 void ImagePPM_close(ImagePPM *img) {
@@ -278,15 +340,24 @@ int main(int argc, char **argv) {
   uint16_t height = 1080;
   ImagePPM img_test = ImagePPM_create_solid_canvas(
       (RGB){.r = 255, .g = 255, .b = 255}, width, height);
-  Axis ax={.width=10,.padding=0.125};
+  Axis ax = {.width = 10, .padding = 0.125, .grid = true};
   ImagePPM_draw_ax(&img_test, ax);
-  size_t N = 1000;
+  size_t subsampling = 5;
+  size_t N = img.width / subsampling;
   double x[N], y[N];
   for (size_t i = 0; i < N; i++) {
-    x[i] = (double)i / (N - 1) * 5;
-    y[i] = sinf(x[i] * x[i])/(x[i]+1);
+    x[i] = (double)i;
+    y[i] = (double)img.buffer[200 + i * subsampling];
   }
-  ImagePPM_draw_lineplot(&img_test,ax, x, y, N, (RGB){255, 0, 0}, 5);
+  ImagePPM_draw_lineplot(&img_test, ax, x, y, N, (RGB){255, 0, 0}, 5, 0.05);
+
+  char title[255];
+  sprintf(title, "GRAFICO DE LINHA VS INTENSIDADE (minimo=%hu,maximo=%hu)",
+          min_gray, max_gray);
+  ImagePPM_draw_string(
+      &img_test, (Point2D){(uint16_t)(width * 0.15), (uint16_t)(height * 0.085)},
+      title, (RGB){0, 0, 0}, 3);
+
   ImagePPM_save(&img_test, "teste.ppm");
 
   // uint16_t line_number;
