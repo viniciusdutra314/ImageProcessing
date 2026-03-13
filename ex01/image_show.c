@@ -11,12 +11,12 @@
 #include <string.h>
 
 #define sign(x) (((x) > 0) - ((x) < 0))
-#define MAX(x, y) (x) > (y) ? (x) : (y)
-#define MIN(x, y) (x) > (y) ? (y) : (x)
-#define ABS(x) (x) > 0 ? (x) : (-(x))
+#define MAX(x, y) ((x) > (y) ? (x) : (y))
+#define MIN(x, y) ((x) > (y) ? (y) : (x))
+#define ABS(x) ((x) > 0 ? (x) : (-(x)))
 #define PI 3.1415926
 
-typedef enum { IMG_GRAY8, IMG_GRAY16, IMG_RGB8, IMG_RGB16 } ImageType;
+typedef enum ImageType { IMG_GRAY8, IMG_GRAY16, IMG_RGB8, IMG_RGB16 } ImageType;
 
 typedef uint16_t Sample16;
 typedef uint8_t Sample8;
@@ -159,9 +159,9 @@ void NetpbmImage_draw_line(NetpbmImage *img, Point2D p1, Point2D p2,
   for (size_t gamma = 0; gamma <= delta_gamma; gamma++) {
     size_t x = round((double)p1.x + (gamma * (double)delta_x / delta_gamma));
     size_t y = round((double)p1.y + (gamma * (double)delta_y / delta_gamma));
-    size_t offset = thickness / 2;
-    for (size_t dy = -offset; dy <= offset; dy++) {
-      for (size_t dx = -offset; dx <= offset; dx++) {
+    ptrdiff_t offset = thickness / 2;
+    for (ptrdiff_t dy = -offset; dy <= offset; dy++) {
+      for (ptrdiff_t dx = -offset; dx <= offset; dx++) {
         size_t nx = x + dx;
         size_t ny = y + dy;
         if (nx < img->width && ny < img->height) {
@@ -239,9 +239,16 @@ int NetpbmImage_save(NetpbmImage const *img, char const *filepath) {
     pixel_size = sizeof(RGB16);
     break;
   }
+  uint16_t max_intensity = 0;
+  for (size_t i = 0; i < img->width ; i++) {
+      for (size_t j=0;j<img->height;j++){
+          Sample16 intensity =RGB16_to_intensity(NetpbmImage_get_pixel(img, (Point2D){i,j}));
+          if (intensity> max_intensity) max_intensity = intensity;
+      }
+  }
 
   fprintf(file, "%s\n%zu %zu\n%hu\n", magic_number, img->width, img->height,
-      255);
+      max_intensity);
   size_t total_pixels = img->height * img->width;
   if (fwrite(img->raw_image, pixel_size, total_pixels, file) != total_pixels) {
     fprintf(stderr, "Erro na escrita do buffer da imagem %s\n", filepath);
@@ -257,6 +264,7 @@ int NetpbmImage_create(NetpbmImage *img, size_t width, size_t height) {
   img->width = width;
   img->height = height;
   img->raw_image = nullptr;
+  img->max_intensity=0;
   size_t total_pixels = width * height;
   switch (img->type) {
   case IMG_GRAY8:
@@ -551,7 +559,7 @@ int main(int argc, char **argv) {
 
   uint16_t width = 1920;
   uint16_t height = 1080;
-  NetpbmImage figure;
+  NetpbmImage figure={.type=IMG_RGB8};
   NetpbmImage_create_solid_canvas(
       &figure, (RGB16){.r = 255, .g = 255, .b = 255}, width, height);
   Axis ax = {.width = 10, .padding = 0.125, .grid = true};
@@ -598,9 +606,10 @@ int main(int argc, char **argv) {
   char title[255];
   sprintf(title, "PERFIL DE INTENSIDADE (min=%hu,max=%hu)", y_min, y_max);
   NetpbmImage_draw_string(
-      &figure, (Point2D){(uint16_t)(width * 0.15), (uint16_t)(height * 0.085)},
+      &figure, (Point2D){width * 0.15, height * 0.085},
       title, (RGB16){0, 0, 0}, 3);
   NetpbmImage_show(&figure);
   NetpbmImage_save(&figure, filepath_output_graph);
   NetpbmImage_close(&figure);
+  NetpbmImage_close(&img);
 }
