@@ -8,6 +8,14 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/my_lib/my_lib.zig"),
         .target = target,
     });
+    const raylib_dep = b.dependency("raylib_zig", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const raylib = raylib_dep.module("raylib");
+    const raygui = raylib_dep.module("raygui");
+    const raylib_artifact = raylib_dep.artifact("raylib");
 
     var dir = std.fs.cwd().openDir("src/", .{ .iterate = true }) catch return;
     defer dir.close();
@@ -22,12 +30,10 @@ pub fn build(b: *std.Build) void {
                     .root_source_file = b.path(path),
                     .target = target,
                     .optimize = optimize,
-                    .imports = &.{
-                        .{ .name = "ImageProcessing", .module = my_lib_mod },
-                    },
+                    .imports = &.{ .{ .name = "ImageProcessing", .module = my_lib_mod }, .{ .name = "raylib", .module = raylib }, .{ .name = "raygui", .module = raygui } },
                 }),
             });
-
+            exe.linkLibrary(raylib_artifact);
             b.installArtifact(exe);
 
             const run_cmd = b.addRunArtifact(exe);
