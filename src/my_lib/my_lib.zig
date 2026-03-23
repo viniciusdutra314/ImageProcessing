@@ -71,6 +71,21 @@ pub fn Image(comptime color_space: ColorSpace, comptime Component: type, comptim
                 },
             }
         }
+
+        pub fn getSliceMut(self: Self) []Pixel {
+            return switch (storage) {
+                .interleaved => self.data,
+                .planar => @compileError("Não existe um buffer único no caso planar"),
+            };
+        }
+
+        pub fn getSlice(self: Self) []const Pixel {
+            return switch (storage) {
+                .interleaved => self.data,
+                .planar => @compileError("Não existe um buffer único no caso planar"),
+            };
+        }
+
         pub fn sizeInBytes(self: *Self) usize {
             return self.data.len * @sizeOf(Pixel);
         }
@@ -127,6 +142,18 @@ pub fn Image(comptime color_space: ColorSpace, comptime Component: type, comptim
                 }
             }
             return counts;
+        }
+
+        pub fn toGrayscale(self: Self, allocator: Allocator) !Image(.grayscale, Component, storage) {
+            const DestType = Image(.grayscale, Component, storage);
+            var dest = try DestType.init(allocator, self.width, self.height);
+            for (0..self.height) |y| {
+                for (0..self.width) |x| {
+                    const lum = self.getLuminance(x, y);
+                    dest.setPixel(x, y, .{@intFromFloat(lum)});
+                }
+            }
+            return dest;
         }
     };
 }
