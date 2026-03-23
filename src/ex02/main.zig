@@ -69,22 +69,51 @@ pub fn main() !void {
 
     var a_slider: f32 = 1.0;
     var b_slider: f32 = 0.0;
-    var threshold_slider: f32 = 255.0;
+    var threshold_slider: f32 = 0;
 
     rl.setTargetFPS(0);
-
+    var iterations: u32 = 0;
+    var time: f64 = 0.0;
     while (!rl.windowShouldClose()) {
+        iterations += 1;
         var histogram = [_]usize{0} ** 256;
-        for (original_img.getSlice(), processed_img.getSliceMut()) |old_pixel, *new_pixel| {
-            const float_pixel: f32 = @floatFromInt(old_pixel[0]);
-            if (float_pixel > threshold_slider) {
-                new_pixel[0] = 0;
-            } else {
-                const new_float_pixel = std.math.clamp(a_slider * float_pixel + b_slider, 0.0, 255.0);
-                new_pixel[0] = @intFromFloat(new_float_pixel);
-                histogram[@intFromFloat(float_pixel)] += 1;
+        const original_pixels = original_img.getSlice();
+        const processed_pixels = processed_img.getSliceMut();
+        const simd_size = std.simd.suggestVectorLength(u8).?;
+        //const simd_size = 1;
+        const VectorU8 = @Vector(simd_size, u8);
+        const VectorF32 = @Vector(simd_size, f32);
+        const start_time = std.time.nanoTimestamp();
+        {
+            var pixel_index: usize = 0;
+            const threshold_v: VectorF32 = @splat(threshold_slider);
+            while (pixel_index + simd_size <= original_pixels.len) : (pixel_index += simd_size) {
+                const v_pixels = @as(*align(1) const VectorU8, @ptrCast(original_pixels[pixel_index..].ptr)).*;
+                const v_float: VectorF32 = @floatFromInt(v_pixels);
+                const mask = v_float >= threshold_v;
+                const v_a: VectorF32 = @splat(a_slider);
+                const v_b: VectorF32 = @splat(b_slider);
+                var v_processed: VectorF32 = v_a * v_float + v_b;
+                v_processed = @min(@max(v_processed, @as(VectorF32, @splat(0.0))), @as(VectorF32, @splat(255.0)));
+                const v_final: VectorU8 = @intFromFloat(v_processed);
+                for (0..simd_size) |j| {
+                    const val = v_final[j];
+                    if (mask[j]) {
+                        processed_pixels[pixel_index + j][0] = val;
+                        histogram[val] += 1;
+                    } else {
+                        processed_pixels[pixel_index + j][0] = 0;
+                    }
+                }
             }
         }
+        const duration_ms = @as(f64, @floatFromInt(std.time.nanoTimestamp() - start_time)) / 1_000_000.0;
+        time += duration_ms;
+        if (iterations % 100 == 0) {
+            const it: f64 = @floatFromInt(iterations);
+            std.debug.print("Processing image avg time = {} ms\n", .{time / it});
+        }
+
         rl.updateTexture(texture, processed_img.getSlice().ptr);
         var max_hist: usize = 0;
         for (histogram) |h| if (h > max_hist) {
@@ -164,7 +193,7 @@ pub fn main() !void {
         if (rg.button(.{ .x = slider_x, .y = sliders_start_y + slider_spacing * 3 + 10, .width = slider_width, .height = 40 }, "Resetar Filtros")) {
             a_slider = 1.0;
             b_slider = 0.0;
-            threshold_slider = 255.0;
+            threshold_slider = 0.0;
         }
 
         rl.endDrawing();
