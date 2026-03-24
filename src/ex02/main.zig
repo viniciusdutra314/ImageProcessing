@@ -32,8 +32,7 @@ fn processImagePart(ctx: *ThreadContext) void {
 
         var v_float: VectorF32 = @floatFromInt(v_pixels);
         const mask = v_float >= threshold_v;
-
-        v_float = @mulAdd(VectorF32, v_a, v_float, v_b);
+        v_float = v_a * (v_float + v_b);
         v_float = @min(@max(v_float, v_0), v_255);
 
         const v_transformed: VectorU8 = @intFromFloat(v_float);
@@ -179,13 +178,15 @@ pub fn main() !void {
         const screen_w: f32 = @floatFromInt(rl.getScreenWidth());
         const screen_h: f32 = @floatFromInt(rl.getScreenHeight());
         const section_w = screen_w / 3.0;
+        const screen_padding: f32 = 30.0;
         const scale = @min((section_w - 60.0) / @as(f32, @floatFromInt(original_img.width)), (screen_h * 0.5) / @as(f32, @floatFromInt(original_img.height)));
         const display_w = @as(f32, @floatFromInt(original_img.width)) * scale;
         const display_h = @as(f32, @floatFromInt(original_img.height)) * scale;
 
         rl.drawTexturePro(original_texture, .{ .x = 0, .y = 0, .width = @floatFromInt(original_texture.width), .height = @floatFromInt(original_texture.height) }, .{ .x = section_w + (section_w - display_w) / 2, .y = 60, .width = display_w, .height = display_h }, .{ .x = 0, .y = 0 }, 0, .white);
+        rl.drawText("Original", @intFromFloat(section_w + screen_padding), 20, 24, rl.Color.black);
         rl.drawTexturePro(texture, .{ .x = 0, .y = 0, .width = @floatFromInt(texture.width), .height = @floatFromInt(texture.height) }, .{ .x = (section_w * 2) + (section_w - display_w) / 2, .y = 60, .width = display_w, .height = display_h }, .{ .x = 0, .y = 0 }, 0, .white);
-
+        rl.drawText("Processada", @intFromFloat(section_w * 2.0 + screen_padding), 20, 24, rl.Color.black);
         var max_hist: usize = 0;
         for (histogram) |h| if (h > max_hist) {
             max_hist = h;
@@ -193,6 +194,10 @@ pub fn main() !void {
         const hist_x: f32 = 30;
         const hist_h: f32 = screen_h * 0.5;
         const hist_w: f32 = section_w - 60;
+
+        rl.drawText("Histograma", @intFromFloat(hist_x), 20, 24, rl.Color.black);
+        rl.drawRectangleLinesEx(.{ .x = hist_x, .y = 60, .width = hist_w, .height = hist_w }, 2, rl.Color.gray);
+
         for (histogram, 0..) |count, i| {
             if (count == 0 or max_hist == 0) continue;
             const bar_h = (@as(f32, @floatFromInt(count)) / @as(f32, @floatFromInt(max_hist))) * hist_h;
@@ -201,13 +206,15 @@ pub fn main() !void {
 
         const slider_x = screen_w / 2 - section_w / 2;
         const start_y = screen_h * 0.65;
-        
-        _ = rg.slider(.{ .x = slider_x, .y = start_y, .width = section_w, .height = 30 }, "", "Contraste", &a_slider, 0.0, 3.0);
-        
-        _ = rg.slider(.{ .x = slider_x, .y = start_y + 40, .width = section_w, .height = 30 }, "", "Brilho", &b_slider, -100.0, 100.0);
-        
-        _ = rg.slider(.{ .x = slider_x, .y = start_y + 80, .width = section_w, .height = 30 }, "", "Limiar", &threshold_slider, 0.0, 255.0);
-        
+
+        var label_buf: [64:0]u8 = undefined;
+        const a_label = try std.fmt.bufPrintZ(&label_buf, "Contraste (a={d:.2})", .{a_slider});
+        _ = rg.slider(.{ .x = slider_x, .y = start_y, .width = section_w, .height = 30 }, "", a_label, &a_slider, 0.0, 10.0);
+        const b_label = try std.fmt.bufPrintZ(&label_buf, "Brilho (b={d:.2})", .{b_slider});
+        _ = rg.slider(.{ .x = slider_x, .y = start_y + 40, .width = section_w, .height = 30 }, "", b_label, &b_slider, -255.0, 255.0);
+        const threshold_label = try std.fmt.bufPrintZ(&label_buf, "Limiar (t={d:.2})", .{threshold_slider});
+        _ = rg.slider(.{ .x = slider_x, .y = start_y + 80, .width = section_w, .height = 30 }, "", threshold_label, &threshold_slider, 0.0, 255.0);
+
         if (rg.button(.{ .x = slider_x, .y = start_y + 120, .width = section_w, .height = 30 }, "Resetar")) {
             a_slider = 1.0;
             b_slider = 0.0;
