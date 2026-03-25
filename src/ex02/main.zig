@@ -210,7 +210,7 @@ fn calcHistogramStats(histogram: *const [256]usize) HistogramStats {
 fn buildCdf(histogram: *const [256]usize, total_pixels: usize) [256]f32 {
     var cdf = [_]f32{0.0} ** 256;
     if (total_pixels == 0) return cdf;
-
+    
     var sum: usize = 0;
     for (0..256) |i| {
         sum += histogram[i];
@@ -362,10 +362,10 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
     defer _ = gpa.deinit();
-
+    
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
-
+    
     if (args.len != 2) {
         std.debug.print("Uso: ex02 <caminho_para_o_arquivo>\n", .{});
         return;
@@ -404,7 +404,7 @@ pub fn main() !void {
 
         var histogram = [_]usize{0} ** 256;
         try processMultithreaded(original_img, &processed_img, ui, contexts, threads, &histogram);
-
+        
         const duration_ms = @as(f64, @floatFromInt(std.time.nanoTimestamp() - start_time)) / 1_000_000.0;
         total_time += duration_ms;
         iterations += 1;
@@ -422,9 +422,9 @@ pub fn main() !void {
             histogram = [_]usize{0} ** 256;
             try processMultithreaded(processed_img, &processed_img, UiState{}, contexts, threads, &histogram);
         }
-
+        
         rl.updateTexture(texture, processed_img.getSlice().ptr);
-
+        
         rl.beginDrawing();
         defer rl.endDrawing();
 
@@ -436,3 +436,4 @@ pub fn main() !void {
         try drawControls(layout, &ui);
     }
 }
+Vinidutr
