@@ -1,7 +1,5 @@
 const std = @import("std");
 const my_lib = @import("../my_lib.zig");
-const Image = my_lib.Image;
-const ConversionPolicy = my_lib.ConversionPolicy;
 
 pub const PgmError = error{
     InvalidMagicNumber,
