@@ -1,10 +1,30 @@
-module Main where
+import Data.Massiv.Array
+import Data.Massiv.Array.IO
 
-import Codec.Picture
+imgSize :: Sz2
+imgSize = Sz2 512 512
+
+mid :: Int
+mid = 512 `div` 2
+
+black :: Pixel (Y D65) Word8
+black = PixelY 0
+
+white :: Pixel (Y D65) Word8
+white = PixelY 255
+
+checkboard :: Array U Ix2 (Pixel (Y D65) Word8)
+checkboard =
+  makeArray
+    Seq
+    imgSize
+    ( \(i :. j) ->
+        if (i < mid && j < mid) || (i >= mid && j >= mid)
+          then black
+          else
+            white
+    )
 
 main :: IO ()
 main = do
-  res <- readImage "/home/vinicius/github/ImageProcessing/isolar.pgm"
-  case res of
-    Left err -> putStrLn $ "Error loading image: " ++ err
-    Right image -> putStrLn "Success! Image opened."
+  writeImage "checkboard.png" checkboard
