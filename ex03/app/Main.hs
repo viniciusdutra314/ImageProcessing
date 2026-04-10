@@ -29,4 +29,6 @@ checkboard =
 
 main :: IO ()
 main = do
-  writeImagePGM "checkboard.pgm" checkboard
+  let kernel = createMatrixWithValue (15, 15) (1.0 / (15.0 * 15.0))
+  let blurred = convolve checkboard kernel
+  writeImagePGM "checkboard.pgm" blurred

@@ -1,14 +1,15 @@
 module Matrix
   ( Matrix,
     Matrix (..),
-    getElement,
+    convolve,
     createMatrixWithValue,
     createMatrixWithFunc,
   )
 where
 
+import Data.Maybe
 import Data.Vector.Unboxed qualified as U
-import Data.Word (Word)
+import Data.Word (Word, Word8)
 
 data Matrix a = Matrix
   { matrixRows :: !Word,
@@ -40,7 +41,36 @@ createMatrixWithFunc :: (U.Unbox a) => (Word, Word) -> ((Word, Word) -> a) -> Ma
 createMatrixWithFunc (rows, cols) func = Matrix rows cols (U.generate size (\index -> func (unflatenCurried index)))
   where
     size = fromIntegral (rows * cols)
-    unflatenCurried = unflatIndex rows
+    unflatenCurried = unflatIndex cols
 
-getElement :: (U.Unbox a) => Matrix a -> Word -> Word -> a
-getElement (Matrix _ m elements) c r = elements U.! fromIntegral (r * m + c)
+index :: (U.Unbox a) => Matrix a -> (Word, Word) -> a
+index (Matrix _ m elements) (r, c) = elements U.! fromIntegral (r * m + c)
+
+indexMaybe :: (U.Unbox a) => Matrix a -> (Word, Word) -> Maybe a
+indexMaybe matrix (r, c)
+  | r >= rows || c >= cols = Nothing
+  | otherwise = Just (index matrix (r, c))
+  where
+    (Matrix rows cols _) = matrix
+
+clamp :: Float -> Word8
+clamp x = fromIntegral (round x)
+
+convolve :: Matrix Word8 -> Matrix Float -> Matrix Word8
+convolve img kernel =
+  createMatrixWithFunc
+    (rows, cols)
+    ( \(r, c) ->
+        clamp
+          ( sum
+              [ (sample (r - center + kr, c - center + kc)) * (index kernel (kr, kc))
+                | kr <- [0 .. rows_k - 1],
+                  kc <- [0 .. cols_k - 1]
+              ]
+          )
+    )
+  where
+    (Matrix rows cols _) = img
+    (Matrix rows_k cols_k _) = kernel
+    center = rows_k `div` 2
+    sample (r, c) = fromIntegral (fromMaybe 0 (indexMaybe img (r, c))) :: Float
