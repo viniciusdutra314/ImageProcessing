@@ -1,6 +1,6 @@
 module Matrix
-  ( Matrix,
-    Matrix (..),
+  ( Matrix (..),
+    ConvolveStrategy (..),
     convolve,
     createMatrixWithValue,
     createMatrixWithFunc,
@@ -9,11 +9,11 @@ where
 
 import Data.Maybe
 import Data.Vector.Unboxed qualified as U
-import Data.Word (Word, Word8)
+import Data.Word (Word8)
 
 data Matrix a = Matrix
-  { matrixRows :: !Word,
-    matrixCols :: !Word,
+  { matrixRows :: Int,
+    matrixCols :: Int,
     matrixElements :: !(U.Vector a)
   }
 
@@ -31,46 +31,71 @@ instance (Show a, U.Unbox a) => Show (Matrix a) where
             let len = fromIntegral cols
         ]
 
-createMatrixWithValue :: (U.Unbox a) => (Word, Word) -> a -> Matrix a
+createMatrixWithValue :: (U.Unbox a) => (Int, Int) -> a -> Matrix a
 createMatrixWithValue (rows, cols) val = Matrix rows cols (U.replicate (fromIntegral (rows * cols)) val)
 
-unflatIndex :: Word -> Int -> (Word, Word)
-unflatIndex cols index = (fromIntegral (index `div` fromIntegral (cols)), fromIntegral (index `mod` fromIntegral (cols)))
+unflatIndex :: Int -> Int -> (Int, Int)
+unflatIndex cols i = (fromIntegral (i `div` fromIntegral cols), fromIntegral (i `mod` fromIntegral cols))
 
-createMatrixWithFunc :: (U.Unbox a) => (Word, Word) -> ((Word, Word) -> a) -> Matrix a
-createMatrixWithFunc (rows, cols) func = Matrix rows cols (U.generate size (\index -> func (unflatenCurried index)))
+createMatrixWithFunc :: (U.Unbox a) => (Int, Int) -> ((Int, Int) -> a) -> Matrix a
+createMatrixWithFunc (rows, cols) func = Matrix rows cols (U.generate size (func . unflatenCurried))
   where
     size = fromIntegral (rows * cols)
     unflatenCurried = unflatIndex cols
 
-index :: (U.Unbox a) => Matrix a -> (Word, Word) -> a
+index :: (U.Unbox a) => Matrix a -> (Int, Int) -> a
 index (Matrix _ m elements) (r, c) = elements U.! fromIntegral (r * m + c)
 
-indexMaybe :: (U.Unbox a) => Matrix a -> (Word, Word) -> Maybe a
-indexMaybe matrix (r, c)
-  | r >= rows || c >= cols = Nothing
+indexMaybe :: (U.Unbox a) => Matrix a -> (Int, Int) -> Maybe a
+indexMaybe matrix@(Matrix rows cols _) (r, c)
+  | r < 0 || r >= rows || c < 0 || c >= cols = Nothing
   | otherwise = Just (index matrix (r, c))
-  where
-    (Matrix rows cols _) = matrix
 
-clamp :: Float -> Word8
-clamp x = fromIntegral (round x)
+clamp :: (Ord a) => a -> a -> a -> a
+clamp min_val max_val x
+  | x < min_val = min_val
+  | x > max_val = max_val
+  | otherwise = x
 
-convolve :: Matrix Word8 -> Matrix Float -> Matrix Word8
-convolve img kernel =
-  createMatrixWithFunc
-    (rows, cols)
-    ( \(r, c) ->
-        clamp
-          ( sum
-              [ (sample (r - center + kr, c - center + kc)) * (index kernel (kr, kc))
-                | kr <- [0 .. rows_k - 1],
-                  kc <- [0 .. cols_k - 1]
-              ]
-          )
-    )
-  where
-    (Matrix rows cols _) = img
-    (Matrix rows_k cols_k _) = kernel
-    center = rows_k `div` 2
-    sample (r, c) = fromIntegral (fromMaybe 0 (indexMaybe img (r, c))) :: Float
+data ConvolveStrategy = Zeroed | Mirrored | Replication | Periodic
+
+convolve :: Matrix Word8 -> Matrix Float -> ConvolveStrategy -> Matrix Word8
+convolve
+  img@(Matrix rows cols _)
+  kernel@(Matrix rows_k cols_k _)
+  convolve_strategy =
+    createMatrixWithFunc
+      (rows, cols)
+      ( \(r, c) ->
+          clamp
+            0
+            255
+            ( round
+                ( sum
+                    [ sample (r - center + kr, c - center + kc)
+                        * (kernel `index` (kr, kc))
+                      | kr <- [0 .. rows_k - 1],
+                        kc <- [0 .. cols_k - 1]
+                    ]
+                )
+            )
+      )
+    where
+      center = rows_k `div` 2
+      sample :: (Int, Int) -> Float
+      sample (r, c) =
+        case convolve_strategy of
+          Zeroed -> fromIntegral $ fromMaybe 0 (indexMaybe img (r, c)) :: Float
+          Mirrored -> fromIntegral $ index img (mirror1D rows r, mirror1D cols c) :: Float
+          Periodic -> fromIntegral $ index img (r `wrap` rows, c `wrap` cols) :: Float
+          Replication -> fromIntegral $ index img (clamp 0 (rows - 1) r, clamp 0 (cols - 1) c) :: Float
+        where
+          mirror1D :: Int -> Int -> Int
+          mirror1D max_coord coord
+            | coord < 0 = -coord + 1
+            | coord >= max_coord = 2 * max_coord - (1 + coord)
+            | otherwise = coord
+          wrap :: Int -> Int -> Int
+          wrap x n
+            | x > 0 = x `mod` n
+            | otherwise = n - 1 - ((-x) `mod` n)

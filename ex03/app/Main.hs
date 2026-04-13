@@ -20,15 +20,10 @@ checkboard =
     size = 512
     mid = size `div` 2
 
--- meanKernel :: Array U Ix2 Double
--- meanKernel = makeArray Seq (Sz (30 :. 30)) (\_ -> 1.0 / (30.0 * 30.0))
-
--- blurStencil = makeConvolutionStencilFromKernel meanKernel
-
--- blurConvolution = mapStencil (Fill 0) blurStencil
-
 main :: IO ()
 main = do
   let kernel = createMatrixWithValue (15, 15) (1.0 / (15.0 * 15.0))
-  let blurred = convolve checkboard kernel
-  writeImagePGM "checkboard.pgm" blurred
+  writeImagePGM "checkboard_zeros_a.pgm" (convolve checkboard kernel Zeroed)
+  writeImagePGM "checkboard_espelhamento_b.pgm" (convolve checkboard kernel Mirrored)
+  writeImagePGM "checkboard_replicacao_c.pgm" (convolve checkboard kernel Replication)
+  writeImagePGM "checkboard_periodico_d.pgm" (convolve checkboard kernel Periodic)
