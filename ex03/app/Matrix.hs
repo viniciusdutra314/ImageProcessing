@@ -7,6 +7,7 @@ module Matrix
     convolve,
     createMatrixWithValue,
     createMatrixWithFunc,
+    createMatrix,
   )
 where
 
@@ -30,15 +31,15 @@ instance (Show a, U.Unbox a) => Show (Matrix a) where
       ++ unlines
         [ show (U.slice start len elements)
           | i <- [0 .. rows - 1],
-            let start = fromIntegral (i * cols),
-            let len = fromIntegral cols
+            let start = i * cols,
+            let len = cols
         ]
 
 createMatrixWithValue :: (U.Unbox a) => (Int, Int) -> a -> Matrix a
-createMatrixWithValue (rows, cols) val = Matrix rows cols (U.replicate (fromIntegral (rows * cols)) val)
+createMatrixWithValue (rows, cols) val = Matrix rows cols (U.replicate (rows * cols) val)
 
 unflatIndex :: Int -> Int -> (Int, Int)
-unflatIndex cols i = (fromIntegral (i `div` fromIntegral cols), fromIntegral (i `mod` fromIntegral cols))
+unflatIndex cols i = (i `div` cols, i `mod` cols)
 
 createMatrix :: (U.Unbox a) => [[a]] -> Matrix a
 createMatrix nested_list = Matrix num_rows num_cols (U.fromList $ concat nested_list)
@@ -49,11 +50,11 @@ createMatrix nested_list = Matrix num_rows num_cols (U.fromList $ concat nested_
 createMatrixWithFunc :: (U.Unbox a) => (Int, Int) -> ((Int, Int) -> a) -> Matrix a
 createMatrixWithFunc (rows, cols) func = Matrix rows cols (U.generate size (func . unflatenCurried))
   where
-    size = fromIntegral (rows * cols)
+    size = rows * cols
     unflatenCurried = unflatIndex cols
 
 unsafeIndex :: (U.Unbox a) => Matrix a -> (Int, Int) -> a
-unsafeIndex (Matrix _ m elements) (r, c) = elements U.! fromIntegral (r * m + c)
+unsafeIndex (Matrix _ m elements) (r, c) = elements U.! (r * m + c)
 
 index :: (U.Unbox a) => Matrix a -> (Int, Int) -> Maybe a
 index matrix@(Matrix rows cols _) (r, c)
@@ -134,7 +135,7 @@ kernelGaussian n sigma =
           let ci = fromIntegral (i - center)
               cj = fromIntegral (j - center)
               r2 = ci * ci + cj * cj
-           in exp (-r2 / (2 * sigma * sigma))
+           in exp $ -(r2 / (2 * sigma * sigma))
       )
   where
     center = n `div` 2
