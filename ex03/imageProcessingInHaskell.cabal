@@ -9,7 +9,15 @@ category:           Graphics
 build-type:         Simple
 extra-doc-files:    CHANGELOG.md
 common warnings
-    ghc-options: -Wall
+    ghc-options:
+       -Wall
+       -Wcompat
+       -Widentities
+       -Wincomplete-patterns
+       -Wincomplete-uni-patterns
+       -Wincomplete-record-updates
+       -O2
+
 
 executable imageProcessingInHaskell
     import:           warnings
@@ -21,6 +29,7 @@ executable imageProcessingInHaskell
         LambdaCase
     build-depends:    base ^>=4.18.3.0,
                       vector,
+                      process,
                       bytestring
     hs-source-dirs:   app
     default-language: GHC2021
