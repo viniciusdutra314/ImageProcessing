@@ -21,115 +21,243 @@ fn main() -> Result<(), Box<dyn Error>> {
     let img_fft = fft2(&img_complex);
     complex_to_logged_gray(&(fftshift2(&img_fft))).save("questao_01/fft_img.jpg")?;
     // Questão 02
-    let img_fft_ifft = ifft2(&img_fft);
-    complex_to_clamped_gray(&img_fft_ifft).save("questao_02/img_fft_ifft.jpg")?;
-    let diff_img_vs_img_fft_ifft = img_complex.clone() - img_fft_ifft;
-    let min_diff = diff_img_vs_img_fft_ifft
-        .iter()
-        .min_by(|a, b| a.norm().partial_cmp(&b.norm()).unwrap())
-        .unwrap();
-    println!("Questão 02:");
-    println!("  Diferença mínima: {:E}", min_diff.norm());
-    let max_diff = diff_img_vs_img_fft_ifft
-        .iter()
-        .max_by(|a, b| a.norm().partial_cmp(&b.norm()).unwrap())
-        .unwrap();
-    println!("  Diferença máxima: {:E}", max_diff.norm());
+    {
+        let img_fft_ifft = ifft2(&img_fft);
+        complex_to_clamped_gray(&img_fft_ifft).save("questao_02/img_fft_ifft.jpg")?;
+        let diff_img_vs_img_fft_ifft = img_complex.clone() - img_fft_ifft;
+        let min_diff = diff_img_vs_img_fft_ifft
+            .iter()
+            .min_by(|a, b| a.norm().partial_cmp(&b.norm()).unwrap())
+            .unwrap();
+        println!("Questão 02:");
+        println!("  Diferença mínima: {:E}", min_diff.norm());
+        let max_diff = diff_img_vs_img_fft_ifft
+            .iter()
+            .max_by(|a, b| a.norm().partial_cmp(&b.norm()).unwrap())
+            .unwrap();
+        println!("  Diferença máxima: {:E}", max_diff.norm());
 
-    complex_to_clamped_gray(&diff_img_vs_img_fft_ifft)
-        .save("questao_02/diff_img_vs_img_fft_ifft.jpg")?;
-    //
+        complex_to_clamped_gray(&diff_img_vs_img_fft_ifft)
+            .save("questao_02/diff_img_vs_img_fft_ifft.jpg")?;
+    }
     // Questão 3
-    let img_fft_shift_ifft = ifft2(&fftshift2(&(img_fft)));
-    complex_to_clamped_gray(&img_fft_shift_ifft).save("questao_03/img_fft_shift_ifft.jpg")?;
-
+    {
+        let img_fft_shift_ifft = ifft2(&fftshift2(&(img_fft)));
+        complex_to_clamped_gray(&img_fft_shift_ifft).save("questao_03/img_fft_shift_ifft.jpg")?;
+    }
     // Questão 4
-    let img_fft_center_zeroed = Array2::<Complex64>::from_shape_fn(img_fft.dim(), |(x, y)| {
-        if (x, y) == (0, 0) {
-            Complex64::zero()
-        } else {
-            img_fft[(x, y)]
-        }
-    });
-
-    let img_fft_zeroed_center_ifft = ifft2(&img_fft_center_zeroed);
-    complex_to_clamped_gray(&img_fft_zeroed_center_ifft)
-        .save("questao_04/img_fft_zeroed_center_ifft.jpg")?;
-    let img_mean_pixel = img_complex.mean().unwrap().re();
-    let img_subtract_avg = image::GrayImage::from_fn(img.width(), img.height(), |x, y| {
-        let v = img.get_pixel(x, y)[0] as f64 - img_mean_pixel;
-        image::Luma([clamp(0.0, 255.0, v) as u8])
-    });
-    img_subtract_avg.save("questao_04/img_removed_avg.jpg")?;
-    // Questão 05
-    let img_fft_odd_lines_zeroed = Array2::<Complex64>::from_shape_fn(img_fft.dim(), |(x, y)| {
-        if y % 2 == 1 {
-            Complex64::zero()
-        } else {
-            img_fft[(x, y)]
-        }
-    });
-
-    complex_to_logged_gray(&img_fft_odd_lines_zeroed)
-        .save("questao_05/fft_odd_lines_zeroed.jpg")?;
-
-    let img_fft_odd_lines_zeroed_ifft = ifft2(&img_fft_odd_lines_zeroed);
-    complex_to_clamped_gray(&img_fft_odd_lines_zeroed_ifft)
-        .save("questao_05/img_ifft_odd_lines_zeroed.jpg")?;
-
-    println!(
-        "Questão 05:\n  dimensão da imagem obtida: {:?}",
-        img_fft_odd_lines_zeroed_ifft.shape()
-    );
-    // Questão 6
-    let img_fft_five_lines_on_and_zeroed =
-        Array2::<Complex64>::from_shape_fn(img_fft.dim(), |(x, y)| {
-            if y % 10 > 5 {
+    {
+        let img_fft_center_zeroed = Array2::<Complex64>::from_shape_fn(img_fft.dim(), |(x, y)| {
+            if (x, y) == (0, 0) {
                 Complex64::zero()
             } else {
                 img_fft[(x, y)]
             }
         });
-    complex_to_logged_gray(&img_fft_five_lines_on_and_zeroed)
-        .save("questao_06/fft_five_lines_on_and_off.jpg")?;
-    let img_fft_five_on_and_off_ifft = ifft2(&img_fft_five_lines_on_and_zeroed);
-    complex_to_clamped_gray(&img_fft_five_on_and_off_ifft)
-        .save("questao_06/img_ifft_five_lines_on_and_off.jpg")?;
-    // Questão 7
-    let img_fft_even_lines =
-        Array2::<Complex64>::from_shape_fn((width, height / 2), |(x, y)| img_fft[(x, 2 * y)]);
-    complex_to_logged_gray(&img_fft_even_lines).save("questao_07/img_fft_even_lines.jpg")?;
-    let img_fft_even_lines_ifft = ifft2(&img_fft_even_lines);
-    complex_to_clamped_gray(&img_fft_even_lines_ifft)
-        .save("questao_07/img_fft_even_lines_ifft.jpg")?;
-    println!(
-        "Questão 07:\n   dimensão da imagem obtida: {:?}",
-        img_fft_even_lines.shape()
-    );
-    // Questão 8
-    let img_fft_even_columns =
-        Array2::<Complex64>::from_shape_fn((width / 2, height), |(x, y)| img_fft[(2 * x, y)]);
-    complex_to_logged_gray(&img_fft_even_columns).save("questao_08/img_fft_even_columns.jpg")?;
-    let img_fft_even_columns_ifft = ifft2(&img_fft_even_columns);
-    complex_to_clamped_gray(&img_fft_even_columns_ifft)
-        .save("questao_08/img_fft_even_columns_ifft.jpg")?;
-    println!(
-        "Questão 08:\n   dimensão da imagem obtida: {:?}",
-        img_fft_even_columns.shape()
-    );
-    // Questão 9
-    let img_fft_even_lines_and_columns =
-        Array2::<Complex64>::from_shape_fn((width / 2, height / 2), |(x, y)| {
-            img_fft[(2 * x, 2 * y)]
+
+        let img_fft_zeroed_center_ifft = ifft2(&img_fft_center_zeroed);
+        complex_to_clamped_gray(&img_fft_zeroed_center_ifft)
+            .save("questao_04/img_fft_zeroed_center_ifft.jpg")?;
+        let img_mean_pixel = img_complex.mean().unwrap().re();
+        let img_subtract_avg = image::GrayImage::from_fn(img.width(), img.height(), |x, y| {
+            let v = img.get_pixel(x, y)[0] as f64 - img_mean_pixel;
+            image::Luma([clamp(0.0, 255.0, v) as u8])
         });
-    complex_to_logged_gray(&img_fft_even_lines_and_columns)
-        .save("questao_09/img_fft_even_lines_and_columns.jpg")?;
-    let img_fft_five_on_and_removed_ifft = ifft2(&img_fft_even_lines_and_columns);
-    complex_to_clamped_gray(&img_fft_five_on_and_removed_ifft)
-        .save("questao_09/img_fft_five_on_and_removed_ifft.jpg")?;
-    println!(
-        "Questão 09:\n   dimensão da imagem obtida: {:?}",
-        img_fft_even_lines_and_columns.shape()
-    );
+        img_subtract_avg.save("questao_04/img_removed_avg.jpg")?;
+    }
+
+    // Questão 05
+    {
+        let img_fft_odd_lines_zeroed =
+            Array2::<Complex64>::from_shape_fn(img_fft.dim(), |(x, y)| {
+                if y % 2 == 1 {
+                    Complex64::zero()
+                } else {
+                    img_fft[(x, y)]
+                }
+            });
+
+        complex_to_logged_gray(&img_fft_odd_lines_zeroed)
+            .save("questao_05/fft_odd_lines_zeroed.jpg")?;
+
+        let img_fft_odd_lines_zeroed_ifft = ifft2(&img_fft_odd_lines_zeroed);
+        complex_to_clamped_gray(&img_fft_odd_lines_zeroed_ifft)
+            .save("questao_05/img_ifft_odd_lines_zeroed.jpg")?;
+
+        println!(
+            "Questão 05:\n  dimensão da imagem obtida: {:?}",
+            img_fft_odd_lines_zeroed_ifft.shape()
+        );
+    }
+
+    // Questão 6
+    {
+        let img_fft_five_lines_on_and_zeroed =
+            Array2::<Complex64>::from_shape_fn(img_fft.dim(), |(x, y)| {
+                if y % 10 < 5 {
+                    Complex64::zero()
+                } else {
+                    img_fft[(x, y)]
+                }
+            });
+        complex_to_logged_gray(&img_fft_five_lines_on_and_zeroed)
+            .save("questao_06/fft_five_lines_on_and_off.jpg")?;
+        let img_fft_five_on_and_off_ifft = ifft2(&img_fft_five_lines_on_and_zeroed);
+        complex_to_clamped_gray(&img_fft_five_on_and_off_ifft)
+            .save("questao_06/img_ifft_five_lines_on_and_off.jpg")?;
+    }
+
+    // Questão 7
+    {
+        let img_fft_even_lines =
+            Array2::<Complex64>::from_shape_fn((width, height / 2), |(x, y)| img_fft[(x, 2 * y)]);
+        complex_to_logged_gray(&img_fft_even_lines).save("questao_07/img_fft_even_lines.jpg")?;
+        let img_fft_even_lines_ifft = ifft2(&img_fft_even_lines);
+        complex_to_clamped_gray(&img_fft_even_lines_ifft)
+            .save("questao_07/img_fft_even_lines_ifft.jpg")?;
+        println!(
+            "Questão 07:\n   dimensão da imagem obtida: {:?}",
+            img_fft_even_lines.shape()
+        );
+    }
+
+    // Questão 8
+    {
+        let img_fft_even_columns =
+            Array2::<Complex64>::from_shape_fn((width / 2, height), |(x, y)| img_fft[(2 * x, y)]);
+        complex_to_logged_gray(&img_fft_even_columns)
+            .save("questao_08/img_fft_even_columns.jpg")?;
+        let img_fft_even_columns_ifft = ifft2(&img_fft_even_columns);
+        complex_to_clamped_gray(&img_fft_even_columns_ifft)
+            .save("questao_08/img_fft_even_columns_ifft.jpg")?;
+        println!(
+            "Questão 08:\n   dimensão da imagem obtida: {:?}",
+            img_fft_even_columns.shape()
+        );
+    }
+
+    // Questão 9
+    {
+        let img_fft_even_lines_and_columns =
+            Array2::<Complex64>::from_shape_fn((width / 2, height / 2), |(x, y)| {
+                img_fft[(2 * x, 2 * y)]
+            });
+        complex_to_logged_gray(&img_fft_even_lines_and_columns)
+            .save("questao_09/img_fft_even_lines_and_columns.jpg")?;
+        let img_fft_five_on_and_removed_ifft = ifft2(&img_fft_even_lines_and_columns);
+        complex_to_clamped_gray(&img_fft_five_on_and_removed_ifft)
+            .save("questao_09/img_fft_five_on_and_removed_ifft.jpg")?;
+        println!(
+            "Questão 09:\n   dimensão da imagem obtida: {:?}",
+            img_fft_even_lines_and_columns.shape()
+        );
+    }
+
+    // Questão 10
+    {
+        let img_fft_shifted = fftshift2(&img_fft);
+
+        let central_row = height / 2;
+        let n_zero = ((width as f64) * 0.15).round() as usize;
+
+        let start = (width - n_zero) / 2;
+        let end = start + n_zero;
+
+        let img_fft_shifted_center_line_15_zeroed =
+            Array2::<Complex64>::from_shape_fn(img_fft_shifted.dim(), |(x, y)| {
+                if y == central_row && x >= start && x < end {
+                    Complex64::zero()
+                } else {
+                    img_fft_shifted[(x, y)]
+                }
+            });
+
+        complex_to_logged_gray(&img_fft_shifted_center_line_15_zeroed)
+            .save("questao_10/fft_center_line_15_zeroed.jpg")?;
+
+        let img_fft_center_line_15_zeroed = fftshift2(&img_fft_shifted_center_line_15_zeroed);
+        let img_ifft_center_line_15_zeroed = ifft2(&img_fft_center_line_15_zeroed);
+
+        complex_to_clamped_gray(&img_ifft_center_line_15_zeroed)
+            .save("questao_10/img_ifft_center_line_15_zeroed.jpg")?;
+    }
+
+    // Questão 11
+    {
+        let img_fft_shifted = fftshift2(&img_fft);
+        let central_col = width / 2;
+        let central_row = height / 2;
+        let n_zero_col = ((height as f64) * 0.15).round() as usize;
+        let n_zero = ((width as f64) * 0.15).round() as usize;
+        let start = (width - n_zero) / 2;
+        let end = start + n_zero;
+        let start_col = (height - n_zero_col) / 2;
+        let end_col = start_col + n_zero_col;
+
+        let img_fft_shifted_center_cross_15_zeroed =
+            Array2::<Complex64>::from_shape_fn(img_fft_shifted.dim(), |(x, y)| {
+                let zero_central_row_segment = y == central_row && x >= start && x < end;
+                let zero_central_col_segment = x == central_col && y >= start_col && y < end_col;
+
+                if zero_central_row_segment || zero_central_col_segment {
+                    Complex64::zero()
+                } else {
+                    img_fft_shifted[(x, y)]
+                }
+            });
+
+        complex_to_logged_gray(&img_fft_shifted_center_cross_15_zeroed)
+            .save("questao_11/fft_center_cross_15_zeroed.jpg")?;
+
+        let img_fft_center_cross_15_zeroed = fftshift2(&img_fft_shifted_center_cross_15_zeroed);
+        let img_ifft_center_cross_15_zeroed = ifft2(&img_fft_center_cross_15_zeroed);
+
+        complex_to_clamped_gray(&img_ifft_center_cross_15_zeroed)
+            .save("questao_11/img_ifft_center_cross_15_zeroed.jpg")?;
+    }
+
+    // Questão 12
+    {
+        let img_fft_double =
+            Array2::<Complex64>::from_shape_fn((2 * width, 2 * height), |(x, y)| {
+                if x % 2 == 1 || y % 2 == 1 {
+                    Complex64::zero()
+                } else {
+                    img_fft[(x / 2, y / 2)]
+                }
+            });
+        complex_to_logged_gray(&img_fft_double).save("questao_12/fft_double.jpg")?;
+        let img_ifft_double = ifft2(&img_fft_double);
+        complex_to_clamped_gray(&img_ifft_double).save("questao_12/img_ifft_double.jpg")?;
+        println!(
+            "Questão 12:\n dimensão da imagem obtida {:?}",
+            img_ifft_double.shape()
+        );
+    }
+    // Questão 13
+    {
+        let max_fft_value = *img_fft
+            .iter()
+            .max_by(|a, b| a.norm().partial_cmp(&b.norm()).unwrap())
+            .unwrap();
+        let img_fft_double_max =
+            Array2::<Complex64>::from_shape_fn((2 * width, 2 * height), |(x, y)| {
+                if x % 2 == 1 || y % 2 == 1 {
+                    max_fft_value
+                } else {
+                    img_fft[(x / 2, y / 2)]
+                }
+            });
+
+        complex_to_logged_gray(&img_fft_double_max).save("questao_13/fft_double_max.jpg")?;
+
+        let img_ifft_double_max = ifft2(&img_fft_double_max);
+        complex_to_clamped_gray(&img_ifft_double_max).save("questao_13/img_ifft_double_max.jpg")?;
+        println!(
+            "Questão 13:\n dimensão da imagem obtida {:?}",
+            img_ifft_double_max.shape()
+        );
+    }
+
     Ok(())
 }
