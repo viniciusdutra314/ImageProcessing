@@ -42,10 +42,6 @@ pub fn complex_to_logged_gray(array: &Array2<Complex64>) -> image::GrayImage {
     let logged_magnitudes = array.mapv(|c| c.norm().ln());
     let max_mag = logged_magnitudes.iter().copied().fold(0.0_f64, f64::max);
 
-    if max_mag == 0.0 {
-        return img;
-    }
-
     for ((x, y), &mag) in logged_magnitudes.indexed_iter() {
         let v = ((mag / max_mag) * 255.0).round() as u8;
         img.put_pixel(x as u32, y as u32, image::Luma([v]));
@@ -66,9 +62,7 @@ pub fn complex_to_clamped_gray(array: &Array2<Complex64>) -> image::GrayImage {
 pub fn fftshift2(input: &Array2<Complex64>) -> Array2<Complex64> {
     let (width, height) = input.dim();
     Array2::<Complex64>::from_shape_fn((width, height), |(x, y)| {
-        let nx = (x + width / 2) % width;
-        let ny = (y + height / 2) % height;
-        input[(nx, ny)]
+        input[((x + width / 2) % width, (y + height / 2) % height)]
     })
 }
 
